@@ -109,6 +109,7 @@ class AppendForm:
                     [Widget.OPTIONMENU_STR, "species", "NCM3722", "1A01"], 
                     [Widget.ENTRY_DBL, "temperature", 37.0],
                     [Widget.ENTRY_DBL, "pH", 7.4],
+                    [Widget.OPTIONMENU_STR, "medium", "MOPS", "N-C-", "ASW"],
                     [Widget.OPTIONMENU_STR, "saltname", "NaCl"], 
                     [Widget.ENTRY_DBL, "saltmolar", 0.0],
                     [Widget.OPTIONMENU_STR, "carbonname", "Glucose", "Acetate", "Pyruvate"], 
