@@ -102,20 +102,34 @@ class AppendForm:
 ############################################################################################
             # Parameter Strings shown in the label:
             #       [0]Zeroth item is the type of the Widget
-            #       [1]First item is the text label
-            #       [2]Second item is the default value of the widget
+            #       [1]First item defines if common additive can be used (salt, carbon, nitrogen)
+            #       [2]Second item is the text label
+            #       [3]Third item is the default value of the widget
             #       Rest of the arguments are the option values from OptionMenu widget
+            self.carbon_wdgt = [[Widget.OPTIONMENU_STR, True, "carbon", "Glucose", "Acetate", "Pyruvate"],
+                                [Widget.ENTRY_DBL, False, "molarity",   0.0]]
+            self.nitrogen_wdgt = [[Widget.OPTIONMENU_STR, True, "nitrogen", "NH4Cl"],
+                                  [Widget.ENTRY_DBL, False, "molarity", 0.0]]
+            self.salt_wdgt = [[Widget.OPTIONMENU_STR, True, "salt", "NaCl", "SSS"],
+                              [Widget.ENTRY_DBL, False, "molarity", 0.0]]
             self.parameters_wdgt = [
-                    [Widget.OPTIONMENU_STR, "species", "NCM3722", "1A01"], 
-                    [Widget.ENTRY_DBL, "temperature", 37.0],
-                    [Widget.ENTRY_DBL, "pH", 7.4],
-                    [Widget.OPTIONMENU_STR, "medium", "MOPS", "N-C-", "ASW"],
-                    [Widget.OPTIONMENU_STR, "saltname", "NaCl"], 
-                    [Widget.ENTRY_DBL, "saltmolar", 0.0],
-                    [Widget.OPTIONMENU_STR, "carbonname", "Glucose", "Acetate", "Pyruvate"], 
-                    [Widget.ENTRY_DBL, "carbonmolar", 0.0],
-                    [Widget.OPTIONMENU_STR, "nitrogenname", "NH4Cl"], 
-                    [Widget.ENTRY_DBL, "nitrogenmolar",0.0]]
+                    [Widget.OPTIONMENU_STR, False, "species", "NCM3722", "1A01"], 
+                    [Widget.ENTRY_DBL, False, "temperature", 37.0],
+                    [Widget.ENTRY_DBL, False, "pH", 7.4],
+                    [Widget.OPTIONMENU_STR, False, "medium", "MOPS", "N-C-", "ASW"]]
+            
+            # nutrients
+            self.parameters_wdgt.append(self.carbon_wdgt[0])
+            self.parameters_wdgt.append(self.carbon_wdgt[1])
+            self.parameters_wdgt.append(self.carbon_wdgt[0])
+            self.parameters_wdgt.append(self.carbon_wdgt[1])
+
+            self.parameters_wdgt.append(self.nitrogen_wdgt[0])
+            self.parameters_wdgt.append(self.nitrogen_wdgt[1])
+
+            self.parameters_wdgt.append(self.salt_wdgt[0])
+            self.parameters_wdgt.append(self.salt_wdgt[1])
+            
             self.paramsz = 2+len(self.parameters_wdgt)
             self.parameters = []
             self.widgets = []
@@ -134,8 +148,8 @@ class AppendForm:
                 elif self.parameters_wdgt[ix][0] == Widget.LABEL_DBL:
                     self.parameters.append(DoubleVar(master))
                     self.widgets.append(Label(master, textvariable=self.parameters[ix]))
-                self.parameters[ix].set(self.parameters_wdgt[ix][2])
-                self.labels.append(Label(master, text=self.parameters_wdgt[ix][1]))
+                self.parameters[ix].set(self.parameters_wdgt[ix][3])
+                self.labels.append(Label(master, text=self.parameters_wdgt[ix][2]))
                 self.isvalidated.append(False)
 
             # Submit button is not going to append after accepting growth and R2 values
@@ -227,29 +241,22 @@ class AppendForm:
                 
                 # For loop for adding the rest of the parameters
                 for ix in range(0,len(self.parameters_wdgt)):
-                    if self.iscommon[ix]:   # An array of common names, such as different types of salt
-                        data[0][self.parameters_wdgt[ix][2]]
-                    if self.isvalidated[ix]:
-                        data[0][self.parameters_wdgt[ix][2]] = self.parameters[ix].get()
-                    else:
-                        data[0][self.parameters_wdgt[ix][2]] = self.parameters[ix]
+                    if self.parameters_wdgt[ix][1]:   # An array of common names, such as different types of salt
+                        data[0][self.parameters_wdgt[ix][2]] = []
+                        if self.isvalidated[ix]:
+                            data[0][self.parameters_wdgt[ix][2]].append({self.parameters_wdgt[ix][2]: self.parameters[ix]})
+                        else:
+                            data[0][self.parameters_wdgt[ix][2]].append({self.parameters_wdgt[ix][2]: self.parameters[ix].get(), 
+                                                                        self.parameters_wdgt[ix+1][2]: self.parameters[ix+1]})
+                    else:    
+                        if self.isvalidated[ix]:
+                            data[0][self.parameters_wdgt[ix][1]] = self.parameters[ix].get()
+                        else:
+                            data[0][self.parameters_wdgt[ix][1]] = self.parameters[ix]
                 
-                        "species": self.parameters[0].get(),
-                        "temperature": self.parameters[1],
-                        "pH": self.parameters[2],
-                        "salt": [{"name": self.parameters[3].get(),
-                                  "molarity": self.parameters[4]
-                                  }],
-                        "carbon": [{"name": self.parameters[5].get(),
-                                    "molarity": self.parameters[6]
-                                    }],
-                        "nitrogen": [{"name": self.parameters[7].get(),
-                                      "molarity": self.parameters[8]
-                                      }],
-                        "measurement": measured_data,
-                        "growth": [{"rate": self.growth.get(),
-                                    "r2": self.r2.get()}]
-                    )]
+                data[0]["measurement"] = measured_data
+                data[0]["growth"] =[{"rate": self.growth.get(), "r2": self.r2.get()}]
+               
     
                 # Create a new file?
                 newfile = askyesno(title=None, message="Create a new file?")
@@ -266,7 +273,7 @@ class AppendForm:
                     # Check if a file is compatible
                     try:
                         self.olddata = json.load(open(self.filename))
-                        self.olddata["experiment"].append(data["experiment"][0])
+                        self.olddata.append(data[0])
                     except IOError:
                         print("Corrupted .json file :'" + self.filename + "'")
                         
@@ -320,7 +327,7 @@ class AppendForm:
 
                 for ix in range(0,len(self.parameters_wdgt)):
                     if self.parameters_wdgt[ix][0] == Widget.ENTRY_DBL:
-                        error_msg = self.parameters_wdgt[ix][1] + " must be a float"
+                        error_msg = self.parameters_wdgt[ix][2] + " must be a float"
                         self.parameters[ix] = float(self.widgets[ix].get())
                 
                 error_msg = "time and OD values must be a float"
