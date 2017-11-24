@@ -55,7 +55,7 @@ class AppendForm:
     
         def __init__(self, master):
             # Initial state is SAVE
-            self.state = State.SAVE
+            self.currentstate = State.SAVE
             
             # Cascaded menubar with
             # File -> Open
@@ -72,7 +72,7 @@ class AppendForm:
             
             # Default data size of the time-od pairs
             self.datasz = 5;
-            self.maxrow = 16;
+            self.maxrow = 17;
             
             self.master = master
             master.title("AppendForm")
@@ -118,9 +118,8 @@ class AppendForm:
                     [Widget.ENTRY_DBL, False, "pH", 7.4],
                     [Widget.OPTIONMENU_STR, False, "medium", "MOPS", "N-C-", "ASW"]]
             
-            # nutrients
-            self.parameters_wdgt.append(self.carbon_wdgt[0])
-            self.parameters_wdgt.append(self.carbon_wdgt[1])
+            # Additives
+            # Change the available additives using carbon_wdgt
             self.parameters_wdgt.append(self.carbon_wdgt[0])
             self.parameters_wdgt.append(self.carbon_wdgt[1])
 
@@ -138,7 +137,7 @@ class AppendForm:
             for ix in range(0,len(self.parameters_wdgt)):
                 if self.parameters_wdgt[ix][0] == Widget.OPTIONMENU_STR:
                     self.parameters.append(StringVar(master))
-                    self.widgets.append(OptionMenu(master, self.parameters[ix], *self.parameters_wdgt[ix][2:]))
+                    self.widgets.append(OptionMenu(master, self.parameters[ix], *self.parameters_wdgt[ix][3:]))
                 elif self.parameters_wdgt[ix][0] == Widget.ENTRY_DBL:
                     self.parameters.append(DoubleVar(master))
                     self.widgets.append(Entry(master, textvariable=self.parameters[ix]))
@@ -155,6 +154,8 @@ class AppendForm:
             # Submit button is not going to append after accepting growth and R2 values
             self.submit_button = Button(master, text="Submit", command=self.submit)
             self.append_button = Button(master, text = "Append", command=self.append)
+            self.next_button = Button(master, text = ">" , command=self.Next)
+            self.prev_button = Button(master, text = "<" , command = self.Prev)
             
             # Datas
             self.time = []
@@ -182,6 +183,8 @@ class AppendForm:
 
             self.submit_button.grid(row=self.maxrow,column=0, sticky=W+E)
             self.append_button.grid(row=self.maxrow,column=3, sticky=W+E)
+            self.prev_button.grid(row=self.maxrow,column=1, sticky=W)
+            self.next_button.grid(row=self.maxrow,column=1, sticky=E)
 
             self.total = 0
             self.entered_number = 0
@@ -238,22 +241,26 @@ class AppendForm:
                 
                 # Data must start with idn and date, donot try to change
                 data = [{"idn": self.idn.get(),"date": self.date.get()}]
+                commons = [];
                 
                 # For loop for adding the rest of the parameters
-                for ix in range(0,len(self.parameters_wdgt)):
-                    if self.parameters_wdgt[ix][1]:   # An array of common names, such as different types of salt
-                        data[0][self.parameters_wdgt[ix][2]] = []
-                        if self.isvalidated[ix]:
-                            data[0][self.parameters_wdgt[ix][2]].append({self.parameters_wdgt[ix][2]: self.parameters[ix]})
+                rix = 0
+                while rix < len(self.parameters_wdgt):
+                    if self.parameters_wdgt[rix][1]:   # An array of common names, such as different sources of salt, carbon, nitrogen
+                        if self.isvalidated[rix]:
+                            showinfo(title="!!!ERRROR!!!" , message="Validated entry cannot be common!!")
                         else:
-                            data[0][self.parameters_wdgt[ix][2]].append({self.parameters_wdgt[ix][2]: self.parameters[ix].get(), 
-                                                                        self.parameters_wdgt[ix+1][2]: self.parameters[ix+1]})
+                            commons.append({self.parameters_wdgt[rix][2]: self.parameters[rix].get(), 
+                                                                        self.parameters_wdgt[rix+1][2]: self.parameters[rix+1]})
+                            rix += 1
                     else:    
-                        if self.isvalidated[ix]:
-                            data[0][self.parameters_wdgt[ix][1]] = self.parameters[ix].get()
+                        if self.isvalidated[rix]:
+                            data[0][self.parameters_wdgt[rix][2]] = self.parameters[rix]
                         else:
-                            data[0][self.parameters_wdgt[ix][1]] = self.parameters[ix]
-                
+                            data[0][self.parameters_wdgt[rix][2]] = self.parameters[rix].get()
+                    rix += 1
+
+                data[0]["additives"] = commons
                 data[0]["measurement"] = measured_data
                 data[0]["growth"] =[{"rate": self.growth.get(), "r2": self.r2.get()}]
                
@@ -329,6 +336,7 @@ class AppendForm:
                     if self.parameters_wdgt[ix][0] == Widget.ENTRY_DBL:
                         error_msg = self.parameters_wdgt[ix][2] + " must be a float"
                         self.parameters[ix] = float(self.widgets[ix].get())
+                        self.isvalidated[ix] = True
                 
                 error_msg = "time and OD values must be a float"
                 
@@ -394,14 +402,26 @@ class AppendForm:
                 self.olddata = json.load(open(self.filename))
                 sz = len(self.olddata["experiment"])
                 showinfo(title="Warning", message=str(sz) + " experiments are found. Go to desired experiment with > or < buttons")
-                self.loaded = True
+                self.currentstate = State.LOAD
                 self.Update()
             except IOError:
                 print("Corrupted file!" + self.filename)
         def New(self):
             print("reset form")
+            self.currentstate = State.SAVE
+            self.Update()
         def Update(self):
             print("update")
+        def Next(self):
+            if self.currentstate == State.LOAD:
+                print("find and show next item from data")
+            else:
+                showinfo(title="Error", message = "Load a file before using the next button")
+        def Prev(self):
+            if self.currentstate == State.LOAD:
+                print("find and show previous item from data")
+            else:
+                showinfo(title="Error", message = "Load a file before using the previous button")
             
 root = Tk()
 app = AppendForm(master=root)
