@@ -8,12 +8,13 @@ Created on Thu Nov 16 13:08:54 2017
 # Form for entering data into the json file
 
 # Dialog box and forms
-from tkinter import Tk, Button, Menu, OptionMenu, Entry, DoubleVar, StringVar, Label, W, E
+from tkinter import Tk, Button, Toplevel, Menu, OptionMenu, Entry, DoubleVar, StringVar, Label, W, E
 from tkinter.messagebox import showinfo, askyesno
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
 # Date structure 
 import datetime
+import calendar 
 
 # Creating Random characters 
 import string
@@ -55,7 +56,7 @@ class AppendForm:
     
         def __init__(self, master):
             # Initial state is SAVE
-            self.state = State.SAVE
+            self.currentstate = State.SAVE
             
             # Cascaded menubar with
             # File -> Open
@@ -72,7 +73,7 @@ class AppendForm:
             
             # Default data size of the time-od pairs
             self.datasz = 5;
-            self.maxrow = 16;
+            self.maxrow = 17;
             
             self.master = master
             master.title("AppendForm")
@@ -92,7 +93,8 @@ class AppendForm:
             # Currently set to string variable, consider giving a drop down menu
             #   and choose a date from a calendar
             self.date = StringVar(master, value = "")
-            self.date_entry = Entry(master, textvariable=self.date)
+            self.date_entry = Entry(master, textvariable=self.date, state="disabled")
+            self.date_entry.bind("<ButtonRelease-1>", self.datepicker)
             self.date_label = Label(master, text="Date")
             
 ############################################################################################            
@@ -118,9 +120,8 @@ class AppendForm:
                     [Widget.ENTRY_DBL, False, "pH", 7.4],
                     [Widget.OPTIONMENU_STR, False, "medium", "MOPS", "N-C-", "ASW"]]
             
-            # nutrients
-            self.parameters_wdgt.append(self.carbon_wdgt[0])
-            self.parameters_wdgt.append(self.carbon_wdgt[1])
+            # Additives
+            # Change the available additives using carbon_wdgt
             self.parameters_wdgt.append(self.carbon_wdgt[0])
             self.parameters_wdgt.append(self.carbon_wdgt[1])
 
@@ -138,7 +139,7 @@ class AppendForm:
             for ix in range(0,len(self.parameters_wdgt)):
                 if self.parameters_wdgt[ix][0] == Widget.OPTIONMENU_STR:
                     self.parameters.append(StringVar(master))
-                    self.widgets.append(OptionMenu(master, self.parameters[ix], *self.parameters_wdgt[ix][2:]))
+                    self.widgets.append(OptionMenu(master, self.parameters[ix], *self.parameters_wdgt[ix][3:]))
                 elif self.parameters_wdgt[ix][0] == Widget.ENTRY_DBL:
                     self.parameters.append(DoubleVar(master))
                     self.widgets.append(Entry(master, textvariable=self.parameters[ix]))
@@ -155,12 +156,23 @@ class AppendForm:
             # Submit button is not going to append after accepting growth and R2 values
             self.submit_button = Button(master, text="Submit", command=self.submit)
             self.append_button = Button(master, text = "Append", command=self.append)
+            self.next_button = Button(master, text = ">" , command=self.Next)
+            self.prev_button = Button(master, text = "<" , command = self.Prev)
             
             # Datas
+            self.time_label = Label(master, text = "Time(min)")
             self.time = []
+            self.time_entries = []
+            self.od_label = Label(master,text= "OD")
             self.od = []
-            self.add_button = Button(master, text = "+", command=self.add_entry)
-            self.remove_button = Button(master, text = "-", command=self.remove_entry)
+            self.od_entries=[]
+            self.add_buttons = []
+            self.remove_buttons = []
+            for tix in range(0,self.datasz):
+                self.time_entries.append(Entry(master))
+                self.od_entries.append(Entry(master))
+                self.add_buttons.append(Button(master, text = "+", command = lambda lix=tix: self.add_entry(lix)))
+                self.remove_buttons.append(Button(master, text = "-", command = lambda lix= tix: self.remove_entry(lix)))
             
             # Set the default value for append_check to false
             self.append_check = False;
@@ -182,27 +194,25 @@ class AppendForm:
 
             self.submit_button.grid(row=self.maxrow,column=0, sticky=W+E)
             self.append_button.grid(row=self.maxrow,column=3, sticky=W+E)
+            self.prev_button.grid(row=self.maxrow,column=1, sticky=W)
+            self.next_button.grid(row=self.maxrow,column=1, sticky=E)
 
             self.total = 0
             self.entered_number = 0
             
+            # Types of different experiments
+            # This is the biggest and must expansion if we want to keep all of our data in the same way
+            # Currently we have only Experiment.GROWTH_CURVE
             if self.experiment == Experiment.GROWTH_CURVE:
-                # Time array
-                self.time_label = Label(master, text = "Time(min)")
+                # Time and OD array
                 self.time_label.grid(row=0,column=2,sticky=W+E)
-                self.time_entries = []
+                self.od_label.grid(row=0,column=4,sticky=W+E)
                 for tix in range(0,self.datasz):
-                    self.time_entries.append(Entry(master))
-                    self.time_entries[tix].grid(row=1+tix, column=2, sticky=E)
-                        
-                # OD array
-                self.od_label = Label(master,text= "OD")
-                self.od_label.grid(row=0,column=3,sticky=W+E)
-                self.od_entries = []
-                for oix in range(0,self.datasz):
-                    self.od_entries.append(Entry(master))
-                    self.od_entries[oix].grid(row=1+oix, column=3, sticky=E)
-                
+                    self.time_entries[tix].grid(row=1+tix, column=2, sticky=W+E, padx=10)
+                    self.od_entries[tix].grid(row=1+tix, column=3, sticky=W+E, padx=10)
+                    self.add_buttons[tix].grid(row=1+tix, column=4, sticky=W+E)
+                    self.remove_buttons[tix].grid(row=1+tix,column=5, sticky=W+E)
+                                        
                 # Growth rate label
                 self.growth = DoubleVar(master)
                 self.growth_lbl = Label(master, textvariable=self.growth)
@@ -219,15 +229,14 @@ class AppendForm:
                 self.r2.set(1.0)
                 self.r2_text.grid(row=2+self.paramsz, column=0, sticky=W)
                 self.r2_lbl.grid(row=2+self.paramsz,column=1,sticky=W+E)
-                
-            # Add and remove entry buttons
-            self.add_button.grid(row=1+self.datasz, column=2, sticky=E)
-            self.remove_button.grid(row=1+self.datasz, column=3, sticky=E)
 
+        # Method for submit button
+        # Validates the entries, and calculates stuff
         def submit(self):              
             self.append_check = self.validate()
-            self.calculate_growth(0,self.datasz)   
-            self.calculate_r2(0,self.datasz)
+            if self.experiment == Experiment.GROWTH_CURVE:
+                self.calculate_growth(0,self.datasz)   
+                self.calculate_r2(0,self.datasz)
             
         def append(self):
             if self.append_check:
@@ -238,22 +247,26 @@ class AppendForm:
                 
                 # Data must start with idn and date, donot try to change
                 data = [{"idn": self.idn.get(),"date": self.date.get()}]
+                commons = [];
                 
                 # For loop for adding the rest of the parameters
-                for ix in range(0,len(self.parameters_wdgt)):
-                    if self.parameters_wdgt[ix][1]:   # An array of common names, such as different types of salt
-                        data[0][self.parameters_wdgt[ix][2]] = []
-                        if self.isvalidated[ix]:
-                            data[0][self.parameters_wdgt[ix][2]].append({self.parameters_wdgt[ix][2]: self.parameters[ix]})
+                rix = 0
+                while rix < len(self.parameters_wdgt):
+                    if self.parameters_wdgt[rix][1]:   # An array of common names, such as different sources of salt, carbon, nitrogen
+                        if self.isvalidated[rix]:
+                            showinfo(title="!!!ERRROR!!!" , message="Validated entry cannot be common!!")
                         else:
-                            data[0][self.parameters_wdgt[ix][2]].append({self.parameters_wdgt[ix][2]: self.parameters[ix].get(), 
-                                                                        self.parameters_wdgt[ix+1][2]: self.parameters[ix+1]})
+                            commons.append({self.parameters_wdgt[rix][2]: self.parameters[rix].get(), 
+                                                                        self.parameters_wdgt[rix+1][2]: self.parameters[rix+1]})
+                            rix += 1
                     else:    
-                        if self.isvalidated[ix]:
-                            data[0][self.parameters_wdgt[ix][1]] = self.parameters[ix].get()
+                        if self.isvalidated[rix]:
+                            data[0][self.parameters_wdgt[rix][2]] = self.parameters[rix]
                         else:
-                            data[0][self.parameters_wdgt[ix][1]] = self.parameters[ix]
-                
+                            data[0][self.parameters_wdgt[rix][2]] = self.parameters[rix].get()
+                    rix += 1
+
+                data[0]["additives"] = commons
                 data[0]["measurement"] = measured_data
                 data[0]["growth"] =[{"rate": self.growth.get(), "r2": self.r2.get()}]
                
@@ -281,23 +294,23 @@ class AppendForm:
                         json.dump(self.olddata, outfile)
             else:
                 showinfo(title="ERROR!", message="Submit before appending")
-        def add_entry(self):
+        def add_entry(self, idx):
             self.datasz += 1
-            print("datasz = " + str(self.datasz) + "\nmaxrow = " + str(self.maxrow))
+            print("datasz = " + str(self.datasz) + "\nmaxrow = " + str(self.maxrow) + ", idx = " + str(idx))
             
-            # Append time entry
-            self.time_entries.append(Entry(self.master))
-            # Layout of time entry
-            self.time_entries[self.datasz-1].grid(row=self.datasz,column=2,sticky=E)
-            
-            # Append od entry
-            self.od_entries.append(Entry(self.master))
-            # Layout of od entry
-            self.od_entries[self.datasz-1].grid(row=self.datasz,column=3,sticky=E)
-            
-            # Relocate add and remove buttons
-            self.add_button.grid(row=1+self.datasz, column=2, sticky=E)
-            self.remove_button.grid(row=1+self.datasz,column=3, sticky=E)
+            # Append time and OD entries
+            self.time_entries.insert(idx, Entry(self.master))
+            self.od_entries.insert(idx,Entry(self.master))
+            self.add_buttons.insert(idx,Button(self.master,text='+', command=lambda lix = idx: self.add_entry(lix)))
+            self.remove_buttons.insert(idx,Button(self.master,text='-',command=lambda lix = idx: self.remove_entry(lix)))
+            # Layout of time and OD entries
+            for tix in range(idx,self.datasz):
+                self.time_entries[tix].grid(row=1+tix,column=2,sticky=W+E, padx=10)
+                self.od_entries[tix].grid(row=1+tix,column=3,sticky=W+E, padx=10)
+                self.add_buttons[tix].configure(text='+', command=lambda lix=tix: self.add_entry(lix))
+                self.add_buttons[tix].grid(row=1+tix, column=4, sticky=W+E)
+                self.remove_buttons[tix].configure(text='-', command=lambda lix=tix: self.remove_entry(lix))
+                self.remove_buttons[tix].grid(row=1+tix,column=5, sticky=W+E)
             
             # Check if submit and append buttons need to be relocated
             # Relocate if necessary
@@ -305,19 +318,29 @@ class AppendForm:
                 self.maxrow += 1
             self.submit_button.grid(row=self.maxrow, column=0, sticky=W+E)
             self.append_button.grid(row=self.maxrow, column=3, sticky=W+E)
-        def remove_entry(self):
+        def remove_entry(self, idx):
             if (self.datasz> 0):
                 self.datasz -= 1
-            
+            print("datasz = " + str(self.datasz) + "\nmaxrow = " + str(self.maxrow) + ", idx = " + str(idx))
+           
             # remove time and od entries from the grid
-            self.time_entries[self.datasz].grid_remove()
-            self.time_entries.pop()
-            self.od_entries[self.datasz].grid_remove()
-            self.od_entries.pop()
-            
-            # Relocate add and remove buttons
-            self.add_button.grid(row=1+self.datasz, column=2, sticky=E)
-            self.remove_button.grid(row=1+self.datasz,column=3, sticky=E)  
+            self.time_entries[idx].grid_remove()
+            self.time_entries.pop(idx)
+            self.od_entries[idx].grid_remove()
+            self.od_entries.pop(idx)
+            # remove add and remove buttons from the grid
+            self.add_buttons[idx].grid_remove()
+            self.add_buttons.pop(idx)
+            self.remove_buttons[idx].grid_remove()
+            self.remove_buttons.pop(idx)
+
+            for tix in range(idx,self.datasz):
+                self.time_entries[tix].grid(row=1+tix,column=2,sticky=W+E, padx=10)
+                self.od_entries[tix].grid(row=1+tix,column=3,sticky=W+E, padx=10)
+                self.add_buttons[tix].configure(text='+', command=lambda lix=tix: self.add_entry(lix))
+                self.add_buttons[tix].grid(row=1+tix, column=4, sticky=W+E)
+                self.remove_buttons[tix].configure(text='-', command=lambda lix=tix: self.remove_entry(lix))
+                self.remove_buttons[tix].grid(row=1+tix,column=5, sticky=W+E)
             
         def validate(self):
             # Check the ID
@@ -329,6 +352,7 @@ class AppendForm:
                     if self.parameters_wdgt[ix][0] == Widget.ENTRY_DBL:
                         error_msg = self.parameters_wdgt[ix][2] + " must be a float"
                         self.parameters[ix] = float(self.widgets[ix].get())
+                        self.isvalidated[ix] = True
                 
                 error_msg = "time and OD values must be a float"
                 
@@ -392,16 +416,140 @@ class AppendForm:
             self.filename = askopenfilename(defaultextension=".json",  filetypes=(("JSON file", "*.json"), ("All Files", "*.*")))
             try:
                 self.olddata = json.load(open(self.filename))
-                sz = len(self.olddata["experiment"])
+                sz = len(self.olddata[0])
                 showinfo(title="Warning", message=str(sz) + " experiments are found. Go to desired experiment with > or < buttons")
-                self.loaded = True
+                self.currentstate = State.LOAD
                 self.Update()
             except IOError:
                 print("Corrupted file!" + self.filename)
         def New(self):
-            print("reset form")
+            keepdata = askyesno(title="Reset", message="Keep the experiment?")
+            # Keep all the data except the ID.
+            # ID must be different for each measurement, to differentiate different experiments
+            self.idn.set(self.id_generator())
+            if not keepdata:
+                print("Reset all the values")
+            self.currentstate = State.SAVE
+            self.Update()
         def Update(self):
             print("update")
+        def Next(self):
+            if self.currentstate == State.LOAD:
+                print("find and show next item from data")
+            else:
+                showinfo(title="Error", message = "Load a file before using the next button")
+        def Prev(self):
+            if self.currentstate == State.LOAD:
+                print("find and show previous item from data")
+            else:
+                showinfo(title="Error", message = "Load a file before using the previous button")
+                
+        def datepicker(self, event):
+            child = Toplevel()
+            Calendar(child, self.date_entry, self.date)
+ 
+####################################################################################
+# Calendar class for date picker              ######################################
+####################################################################################
+class Calendar:
+    def __init__(self, parent, wdgt, values):
+        self.wdgt = wdgt
+        self.values = values
+        self.parent = parent
+        self.cal = calendar.TextCalendar(calendar.SUNDAY)
+        self.year = datetime.date.today().year
+        self.month = datetime.date.today().month
+        self.wid = []
+        self.day_selected = 1
+        self.month_selected = self.month
+        self.year_selected = self.year
+        self.day_name = ''
+         
+        self.setup(self.year, self.month)
+         
+    def clear(self):
+        for w in self.wid[:]:
+            w.grid_forget()
+            #w.destroy()
+            self.wid.remove(w)
+     
+    def go_prev(self):
+        if self.month > 1:
+            self.month -= 1
+        else:
+            self.month = 12
+            self.year -= 1
+        #self.selected = (self.month, self.year)
+        self.clear()
+        self.setup(self.year, self.month)
+ 
+    def go_next(self):
+        if self.month < 12:
+            self.month += 1
+        else:
+            self.month = 1
+            self.year += 1
+         
+        #self.selected = (self.month, self.year)
+        self.clear()
+        self.setup(self.year, self.month)
+         
+    def selection(self, day, name):
+        self.day_selected = day
+        self.month_selected = self.month
+        self.year_selected = self.year
+        self.day_name = name
+         
+        #data
+        self.values.set("%04d-%02d-%02d" % (self.year , self.month , day))
+#        self.values['day_selected'] = day
+#        self.values['month_selected'] = self.month
+#        self.values['year_selected'] = self.year
+#        self.values['day_name'] = name
+#        self.values['month_name'] = calendar.month_name[self.month_selected]
+         
+        self.clear()
+        self.setup(self.year, self.month)
+         
+    def setup(self, y, m):
+        left = Button(self.parent, text='<', command=self.go_prev)
+        self.wid.append(left)
+        left.grid(row=0, column=1)
+         
+        header = Label(self.parent, height=2, text='{}   {}'.format(calendar.month_abbr[m], str(y)))
+        self.wid.append(header)
+        header.grid(row=0, column=2, columnspan=3)
+         
+        right = Button(self.parent, text='>', command=self.go_next)
+        self.wid.append(right)
+        right.grid(row=0, column=5)
+         
+        days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        for num, name in enumerate(days):
+            t = Label(self.parent, text=name[:3])
+            self.wid.append(t)
+            t.grid(row=1, column=num)
+         
+        for w, week in enumerate(self.cal.monthdayscalendar(y, m), 2):
+            for d, day in enumerate(week):
+                if day:
+                    #print(calendar.day_name[day])
+                    b = Button(self.parent, width=1, text=day, command=lambda day=day:self.selection(day, calendar.day_name[(day-1) % 7]))
+                    self.wid.append(b)
+                    b.grid(row=w, column=d)
+                     
+        sel = Label(self.parent, height=2, text='{} {} {} {}'.format(
+            self.day_name, calendar.month_name[self.month_selected], self.day_selected, self.year_selected))
+        self.wid.append(sel)
+        sel.grid(row=8, column=0, columnspan=7)
+         
+        ok = Button(self.parent, width=5, text='OK', command=self.kill_and_save)
+        self.wid.append(ok)
+        ok.grid(row=9, column=2, columnspan=3, pady=10)
+         
+    def kill_and_save(self):
+        self.parent.destroy()
+
             
 root = Tk()
 app = AppendForm(master=root)
